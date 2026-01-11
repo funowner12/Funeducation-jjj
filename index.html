@@ -1,104 +1,158 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>Fast Firebase Panel</title>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<meta charset="UTF-8">
+<title>Users Admin Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body{margin:0;font-family:Arial;background:#0f172a;color:#fff}
-.container{max-width:420px;margin:auto;padding:12px}
-.card{background:#020617;border-radius:10px;padding:12px;margin-bottom:12px}
-input,button{width:100%;padding:10px;margin-top:6px;border:none;border-radius:8px}
-input{background:#020617;color:#fff;border:1px solid #1e293b}
-button{background:#22c55e;font-weight:bold}
-.danger{background:#ef4444}
-.user{font-size:13px;padding:6px 0;border-bottom:1px solid #1e293b}
-.count{text-align:center;font-size:24px;color:#22c55e}
+body{
+  font-family: Arial, sans-serif;
+  background:#0f172a;
+  color:#fff;
+  margin:0;
+  padding:15px;
+}
+h2{text-align:center}
+.box{
+  background:#111827;
+  padding:15px;
+  border-radius:8px;
+  margin-bottom:15px;
+}
+input{
+  width:100%;
+  padding:10px;
+  border-radius:6px;
+  border:none;
+  margin-bottom:10px;
+}
+button{
+  padding:10px;
+  width:100%;
+  border:none;
+  border-radius:6px;
+  background:#22c55e;
+  color:#000;
+  font-weight:bold;
+}
+.user{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#1f2933;
+  padding:10px;
+  border-radius:6px;
+  margin-top:8px;
+}
+.del{
+  background:#ef4444;
+  color:#fff;
+  border:none;
+  padding:6px 10px;
+  border-radius:4px;
+}
+.total{
+  text-align:center;
+  font-size:14px;
+  color:#94a3b8;
+}
+.hidden{display:none}
 </style>
 </head>
 
 <body>
-<div class="container">
 
-<div class="card">
-  <div class="count" id="totalUsers">0</div>
-  <button onclick="loadUsers()">Refresh Users</button>
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+  <h2>ADMIN LOGIN</h2>
+  <input type="password" id="pass" placeholder="Enter Admin Password">
+  <button onclick="checkPass()">LOGIN</button>
 </div>
 
-<div class="card">
-  <h3>Link</h3>
-  <input id="linkInput" placeholder="New link">
-  <button onclick="saveLink()">Save</button>
-  <div id="linkText"></div>
+<!-- ADMIN PANEL -->
+<div id="adminPanel" class="hidden">
+
+<h2>USERS ADMIN</h2>
+
+<div class="box">
+  <input type="number" id="mobile" placeholder="Enter Mobile Number">
+  <button onclick="addUser()">ADD USER</button>
 </div>
 
-<div class="card">
-  <h3>Add User</h3>
-  <input id="uid" placeholder="User ID">
-  <button onclick="addUser()">Add</button>
-</div>
-
-<div class="card">
-  <h3>Users</h3>
+<div class="box">
+  <div class="total" id="totalUsers">Total Users: 0</div>
   <div id="usersList"></div>
 </div>
 
 </div>
 
 <script>
-var firebaseConfig={
-  apiKey:"YOUR_API_KEY",
-  authDomain:"bdtfu-education.firebaseapp.com",
-  databaseURL:"https://bdtfu-education-default-rtdb.firebaseio.com",
-  projectId:"bdtfu-education"
-};
-firebase.initializeApp(firebaseConfig);
-var db=firebase.database();
+const ADMIN_PASSWORD = "FUN_786";
+const DB = "https://bdtfu-education-default-rtdb.firebaseio.com/Users";
 
-/* LOAD USERS (NO REALTIME) */
-function loadUsers(){
-  usersList.innerHTML="Loading...";
-  db.ref("Users").once("value").then(snap=>{
-    let html="",i=1;
-    if(snap.exists()){
-      snap.forEach(c=>{
-        html+=`<div class="user">${i}. ${c.key}</div>`;
-        i++;
-      });
-      totalUsers.innerText=snap.numChildren();
-    }else{
-      totalUsers.innerText=0;
-      html="No users";
-    }
-    usersList.innerHTML=html;
+function checkPass(){
+  let p = document.getElementById("pass").value;
+  if(p === ADMIN_PASSWORD){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("adminPanel").classList.remove("hidden");
+    loadUsers();
+  }else{
+    alert("Wrong Password");
+  }
+}
+
+function addUser(){
+  let mobile = document.getElementById("mobile").value.trim();
+  if(mobile.length < 2 || mobile.length > 15){
+    alert("Mobile must be 2–15 digits");
+    return;
+  }
+
+  fetch(DB + "/" + mobile + ".json",{
+    method:"PUT",
+    body:JSON.stringify({
+      mobile: mobile,
+      time: new Date().toLocaleString()
+    })
+  }).then(()=>{
+    document.getElementById("mobile").value="";
+    loadUsers();
   });
 }
 
-/* ADD USER */
-function addUser(){
-  if(!uid.value) return;
-  db.ref("Users/"+uid.value).set({
-    brand:"owner",
-    mobile:uid.value,
-    time:new Date().toLocaleString()
-  }).then(loadUsers);
-  uid.value="";
+function deleteUser(id){
+  if(!confirm("Delete this user?")) return;
+  fetch(DB + "/" + id + ".json",{method:"DELETE"}).then(loadUsers);
 }
 
-/* LINK */
-function saveLink(){
-  db.ref("data/data").update({link:linkInput.value});
-  linkInput.value="";
-}
-db.ref("data/data/link").once("value").then(s=>{
-  if(s.exists()) linkText.innerText=s.val();
-});
+function loadUsers(){
+  fetch(DB + ".json")
+  .then(res=>res.json())
+  .then(data=>{
+    let list = document.getElementById("usersList");
+    list.innerHTML="";
 
-/* INITIAL LOAD */
-loadUsers();
+    if(!data){
+      document.getElementById("totalUsers").innerText="Total Users: 0";
+      return;
+    }
+
+    let keys = Object.keys(data);
+    document.getElementById("totalUsers").innerText =
+      "Total Users: " + keys.length;
+
+    keys.reverse().forEach(id=>{
+      let d=document.createElement("div");
+      d.className="user";
+      d.innerHTML=`
+        <span>User ID: ${id}</span>
+        <button class="del" onclick="deleteUser('${id}')">DELETE</button>
+      `;
+      list.appendChild(d);
+    });
+  });
+}
 </script>
 
 </body>
